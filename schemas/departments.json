@@ -1,0 +1,12 @@
+[
+    {
+      "name": "id",
+      "type": "INTEGER",
+      "mode": "REQUIRED"
+    },
+    {
+      "name": "department",
+      "type": "STRING",
+      "mode": "REQUIRED"
+    }
+]

@@ -1,0 +1,12 @@
+[
+    {
+      "name": "id",
+      "type": "INTEGER",
+      "mode": "REQUIRED"
+    },
+    {
+      "name": "job",
+      "type": "STRING",
+      "mode": "REQUIRED"
+    }
+]
