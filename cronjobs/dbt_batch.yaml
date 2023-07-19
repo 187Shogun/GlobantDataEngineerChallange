@@ -27,7 +27,7 @@ spec:
             command:
               - /bin/sh
               - -c
-              - python3 -m luigi --module tasks RunDBTPipeline --DBT-TAG $DBT_TAG --FULL-REFRESH $FULL_REFRESH --workers $LUIGI_WORKERS
+              - python3 -m luigi --module tasks RunDBTPipeline --DBT-TAG $DBT_TAG --FULL-REFRESH $FULL_REFRESH --workers $LUIGI_WORKERS --local-scheduler
             env:
             - name: DBT_TAG
               value: instruments
