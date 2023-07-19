@@ -1,0 +1,13 @@
+options:
+  logging: CLOUD_LOGGING_ONLY
+steps:
+  # Docker Build
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t',
+           '$_ARTIFACT_REGISTRY_PATH/$_IMAGE_NAME:latest',
+           '.']
+
+  # Docker Push
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push',
+           '$_ARTIFACT_REGISTRY_PATH/$_IMAGE_NAME:latest']
