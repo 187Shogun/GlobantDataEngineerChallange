@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+
+  - name: sdz
+    description: Collection of landing tables.
+    schema: sdz
+    database: gdet-001
+    tables:
+      - name: sdz_hr_hired_employees
+      - name: sdz_hr_departments
+      - name: sdz_hr_jobs
