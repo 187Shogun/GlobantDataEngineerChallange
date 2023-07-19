@@ -6,4 +6,4 @@ fastavro
 google
 requests
 pytz
-dbt
+dbt-bigquery
