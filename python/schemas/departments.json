@@ -5,8 +5,8 @@
       "mode": "REQUIRED"
     },
     {
-      "name": "job",
+      "name": "department",
       "type": "STRING",
-      "mode": "REQUIRED"
+      "mode": "NULLABLE"
     }
 ]
