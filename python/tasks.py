@@ -23,30 +23,57 @@ bq_client = bigquery.Client()
 
 
 class LoadCSVtoBigQuery(CustomExternalTask):
-    """ Load Master-Table partitions from GCS into a BQ table."""
+
+    """
+    Load a CSV file from GCS into a BigQuery table.
+
+    Args:
+        OBJECT (str): The name of the CSV file in GCS.
+
+    Output:
+        luigi.LocalTarget: A file containing the output of the BigQuery job.
+    """
+
     OBJECT = luigi.Parameter()
-    SOURCE = luigi.Parameter()
-    DESTINATION = luigi.Parameter()
+    SOURCE = "gs://gdet-data-lake-001/hr/manual-uploads/"
+    DESTINATION = "gdet-001.sdz.sdz_hr_"
 
     def output(self):
-        return luigi.LocalTarget(f"tmp/{self.get_task_family()}-{self.SOURCE}.txt")
+        return luigi.LocalTarget(f"tmp/{self.get_task_family()}-{self.OBJECT}.txt")
 
     def run(self):
-        logging.info(f"Submitting BatchLoad job from: {self.SOURCE} to: {self.DESTINATION}")
-        table = bigquery.Table(str(self.DESTINATION), schema=self.get_json_schema())
+        """
+        Submit a BigQuery job to load the CSV file into a table.
+
+        Logging is used to track the progress of the job.
+        """
+        logging.info(f"Submitting BatchLoad job from: {self.SOURCE}{self.OBJECT} to: {self.DESTINATION}{self.OBJECT}")
+        table = bigquery.Table(f"{self.DESTINATION}{self.OBJECT}", schema=self.get_json_schema())
         _ = bq_client.create_table(table, exists_ok=True)
         job = self.submit_job()
         self.write_txt(str(job))
 
     def submit_job(self):
+        """
+        Submit a BigQuery job to load the CSV file into a table.
+
+        Returns:
+            The result of the BigQuery job as a dictionary.
+        """
         load_job = bigquery.Client().load_table_from_uri(
-            source_uris=self.SOURCE,
-            destination=self.DESTINATION,
+            source_uris=f"{self.SOURCE}{self.OBJECT}.csv",
+            destination=f"{self.DESTINATION}{self.OBJECT}",
             job_config=self.job_config()
         )
         return load_job.result().__dict__
 
     def job_config(self):
+        """
+        Configure the BigQuery job.
+
+        Returns:
+            The BigQuery job configuration as a dictionary.
+        """
         return bigquery.LoadJobConfig(
             allow_quoted_newlines=True,
             create_disposition='CREATE_IF_NEEDED',
@@ -57,9 +84,39 @@ class LoadCSVtoBigQuery(CustomExternalTask):
         )
 
     def get_json_schema(self) -> list:
-        file_name = str(self.OBJECT).split('-')[0]
-        with open(os.path.join(os.path.dirname(os.getcwd()), 'schemas', f"{file_name}.json"), "r") as f:
+        """
+        Load the JSON schema from a file.
+
+        Returns:
+            The JSON schema as a list.
+        """
+        with open(f"schemas/{self.OBJECT}.json", "r") as f:
             return json.loads(f.read())
+
+
+class LoadHRObjectsToBigQuery(luigi.WrapperTask):
+
+    """
+    Wrapper to load all tables from GCS to BigQuery.
+
+    Args:
+        OBJECTS (list): A list of the names of the tables to load.
+
+    Output:
+        None.
+    """
+
+    OBJECTS = ['departments', 'jobs', 'hired_employees']
+
+    def requires(self):
+        """
+        Iterate over the list of objects and yield a `LoadCSVtoBigQuery` task for each object.
+
+        Returns:
+            None.
+        """
+        for i in self.OBJECTS:
+            yield LoadCSVtoBigQuery(OBJECT=i)
 
 
 # class BackupTableToAvro(luigi.Task):
@@ -109,7 +166,4 @@ class LoadCSVtoBigQuery(CustomExternalTask):
 
 
 if __name__ == '__main__':
-    _object = "departments-20230718"
-    _source = "gdet-data-lake-001/hr/manual-uploads/departments-20230718.csv"
-    _destination = "gdet-001.sdz.sdz_hr_departments"
-    luigi.build([LoadCSVtoBigQuery(OBJECT=_object, SOURCE=_source, DESTINATION=_destination)], local_scheduler=True)
+    luigi.build([LoadHRObjectsToBigQuery()], local_scheduler=True)
