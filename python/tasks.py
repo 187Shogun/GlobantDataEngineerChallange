@@ -19,7 +19,6 @@ from custom_luigi import CustomExternalTask
 from datetime import datetime
 
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r'C:\Users\alche\PycharmProjects\GlobantDataEngineerChallange\gdet-001-keys.json'
 bq_client = bigquery.Client()
 ts = datetime.now().date()
 
@@ -219,7 +218,3 @@ class RestoreHRTablesFromAVRO(luigi.WrapperTask):
         """
         for i in self.TABLES:
             yield RestoreTableFromAvro(TABLE_NAME=i)
-
-
-if __name__ == '__main__':
-    luigi.build([RestoreHRTablesFromAVRO()], local_scheduler=True)
