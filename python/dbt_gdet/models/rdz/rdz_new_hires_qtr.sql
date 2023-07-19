@@ -24,9 +24,9 @@ BaseTable AS (
         PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', a.datetime) AS hire_date,
         b.department,
         c.job
-    FROM {{ ref("sdz_hr_hired_employees") }} a
-    LEFT JOIN {{ ref("sdz_hr_departments") }} b ON a.department_id = b.id
-    LEFT JOIN {{ ref("sdz_hr_jobs") }} c ON a.job_id = c.id
+    FROM {{ source("sdz", "sdz_hr_hired_employees") }} a
+    LEFT JOIN {{ source("sdz", "sdz_hr_departments") }} b ON a.department_id = b.id
+    LEFT JOIN {{ source("sdz", "sdz_hr_jobs") }} c ON a.job_id = c.id
     WHERE b.department IS NOT NULL
 ),
 
