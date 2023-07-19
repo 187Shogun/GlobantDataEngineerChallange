@@ -16,14 +16,15 @@ import logging
 import json
 from google.cloud import bigquery
 from custom_luigi import CustomExternalTask
+from datetime import datetime
 
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r'C:\Users\alche\PycharmProjects\GlobantDataEngineerChallange\gdet-001-keys.json'
 bq_client = bigquery.Client()
+ts = datetime.now().date()
 
 
 class LoadCSVtoBigQuery(CustomExternalTask):
-
     """
     Load a CSV file from GCS into a BigQuery table.
 
@@ -33,7 +34,6 @@ class LoadCSVtoBigQuery(CustomExternalTask):
     Output:
         luigi.LocalTarget: A file containing the output of the BigQuery job.
     """
-
     OBJECT = luigi.Parameter()
     SOURCE = "gs://gdet-data-lake-001/hr/manual-uploads/"
     DESTINATION = "gdet-001.sdz.sdz_hr_"
@@ -95,7 +95,6 @@ class LoadCSVtoBigQuery(CustomExternalTask):
 
 
 class LoadHRObjectsToBigQuery(luigi.WrapperTask):
-
     """
     Wrapper to load all tables from GCS to BigQuery.
 
@@ -105,7 +104,6 @@ class LoadHRObjectsToBigQuery(luigi.WrapperTask):
     Output:
         None.
     """
-
     OBJECTS = ['departments', 'jobs', 'hired_employees']
 
     def requires(self):
@@ -119,51 +117,109 @@ class LoadHRObjectsToBigQuery(luigi.WrapperTask):
             yield LoadCSVtoBigQuery(OBJECT=i)
 
 
-# class BackupTableToAvro(luigi.Task):
-#     table = luigi.DictParameter()
-#
-#     def requires(self):
-#         return LoadCSVtoBigQuery(self.table)
-#
-#     def run(self):
-#         dataset_id = self.table.get('dataset_id')
-#         table_id = self.table.get('table_id')
-#         bucket_name = self.table.get('bucket_name')
-#         blob_name = self.table.get('blob_name')
-#
-#         table_ref = bq_client.dataset(dataset_id).table(table_id)
-#         destination_uri = f"gs://{bucket_name}/{blob_name}"
-#         extract_job_config = bigquery.ExtractJobConfig()
-#         extract_job_config.destination_format = bigquery.DestinationFormat.AVRO
-#
-#         extract_job = bq_client.extract_table(
-#             table_ref,
-#             destination_uri,
-#             job_config=extract_job_config
-#         )
-#         extract_job.result()
-#
-#
-# class RestoreTableFromAvro(luigi.Task):
-#     table = luigi.DictParameter()
-#
-#     def requires(self):
-#         return BackupTableToAvro(self.table)
-#
-#     def run(self):
-#         dataset_id = self.table.get('dataset_id')
-#         table_id = self.table.get('table_id')
-#         bucket_name = self.table.get('bucket_name')
-#         blob_name = self.table.get('blob_name')
-#
-#         dataset_ref = bq_client.dataset(dataset_id)
-#         job_config = bigquery.LoadJobConfig()
-#         job_config.source_format = bigquery.SourceFormat.AVRO
-#
-#         gcs_uri = f"gs://{bucket_name}/{blob_name}"
-#         load_job = bq_client.load_table_from_uri(gcs_uri, dataset_ref.table(table_id), job_config=job_config)
-#         load_job.result()
+class BackupTableToAvro(CustomExternalTask):
+    """
+    Backup a BigQuery table to Avro. Inherits from `CustomExternalTask` and requires `luigi.Parameter`.
+    """
+    TABLE_ID = luigi.Parameter()
+    DESTINATION = "gs://gdet-data-lake-001/hr/backups/"
+
+    def output(self):
+        """
+        Define the output for Luigi to check for task completion.
+
+        Returns:
+            luigi.LocalTarget: Local path where the task result is stored.
+        """
+        table_name = str(self.TABLE_ID).split('.')[-1]
+        return luigi.LocalTarget(f"tmp/{self.get_task_family()}-{table_name}.txt")
+
+    def run(self):
+        """
+        Code to backup the BigQuery table to Avro format.
+
+        Raises:
+            Exception: If the BigQuery job fails.
+        """
+        table_name = str(self.TABLE_ID).split('.')[-1]
+        extract_job_config = bigquery.ExtractJobConfig()
+        extract_job_config.destination_format = bigquery.DestinationFormat.AVRO
+        extract_job = bq_client.extract_table(
+            f"{self.TABLE_ID}",
+            f"{self.DESTINATION}{table_name}-{ts}",
+            job_config=extract_job_config
+        )
+        job = extract_job.result()
+        self.write_txt(str(job))
+
+
+class BackupHRTablesToAVRO(luigi.WrapperTask):
+    """
+    Luigi wrapper task to backup multiple BigQuery tables to Avro format.
+    """
+    TABLES = ['departments', 'jobs', 'hired_employees']
+
+    def requires(self):
+        """
+        Task dependencies. Each table in the TABLES list is backed up.
+
+        Yields:
+            object: BackupTableToAvro task for each table in the TABLES list.
+        """
+        for i in self.TABLES:
+            yield BackupTableToAvro(TABLE_ID=f"gdet-001.sdz.sdz_hr_{i}")
+
+
+class RestoreTableFromAvro(CustomExternalTask):
+    """
+    Restore a BigQuery table from Avro format. Inherits from `CustomExternalTask` and requires `luigi.Parameter`.
+    """
+    TABLE_NAME = luigi.Parameter()
+    SOURCE = "gs://gdet-data-lake-001/hr/backups/"
+    DESTINATION = "gdet-001.sdz.sdz_hr_"
+
+    def output(self):
+        """
+        Define the output for Luigi to check for task completion.
+
+        Returns:
+            luigi.LocalTarget: Local path where the task result is stored.
+        """
+        table_name = self.TABLE_NAME
+        return luigi.LocalTarget(f"tmp/{self.get_task_family()}-{table_name}.txt")
+
+    def run(self):
+        """
+        Code to restore the BigQuery table from Avro format.
+
+        Raises:
+            Exception: If the BigQuery job fails.
+        """
+        job_config = bigquery.LoadJobConfig()
+        job_config.source_format = bigquery.SourceFormat.AVRO
+        gcs_uri = f"{self.SOURCE}{'sdz_hr_'}{self.TABLE_NAME}-{ts}"
+        table_id = f"{self.DESTINATION}{self.TABLE_NAME}"
+        load_job = bq_client.load_table_from_uri(gcs_uri, table_id, job_config=job_config)
+        job = load_job.result()
+        self.write_txt(str(job))
+
+
+class RestoreHRTablesFromAVRO(luigi.WrapperTask):
+    """
+    Luigi wrapper task to restore multiple BigQuery tables from Avro format.
+    """
+    TABLES = ['departments', 'jobs', 'hired_employees']
+
+    def requires(self):
+        """
+        Task dependencies. Each table in the TABLES list is restored.
+
+        Yields:
+            object: RestoreTableFromAvro task for each table in the TABLES list.
+        """
+        for i in self.TABLES:
+            yield RestoreTableFromAvro(TABLE_NAME=i)
 
 
 if __name__ == '__main__':
-    luigi.build([LoadHRObjectsToBigQuery()], local_scheduler=True)
+    luigi.build([RestoreHRTablesFromAVRO()], local_scheduler=True)
