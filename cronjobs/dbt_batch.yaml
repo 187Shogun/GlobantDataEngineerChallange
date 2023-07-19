@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etl-gdet-dbt
+spec:
+  schedule: "1 1 1 1 *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 0
+  failedJobsHistoryLimit: 0
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 600
+      parallelism: 1
+      template:
+        metadata:
+          labels:
+            app: etl-gdet-dbt
+        spec:
+          containers:
+          - name: etl-gdet-dbt
+            resources:
+              limits:
+                memory: 512Mi
+                cpu: 250m
+            image: us-docker.pkg.dev/gdet-001/gdet-docker-images/etl-gdet:latest
+            imagePullPolicy: Always
+            command:
+              - /bin/sh
+              - -c
+              - python3 -m luigi --module tasks RunDBTPipeline --DBT-TAG $DBT_TAG --FULL-REFRESH $FULL_REFRESH --workers $LUIGI_WORKERS
+            env:
+            - name: DBT_TAG
+              value: instruments
+            - name: FULL_REFRESH
+              value: "True"
+            - name: LUIGI_WORKERS
+              value: "4"
+          restartPolicy: OnFailure
+          serviceAccountName: gke-worker-sa
+      backoffLimit: 1
