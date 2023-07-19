@@ -1,0 +1,35 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: etl-gdet-restore
+spec:
+  schedule: "1 1 1 1 *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 0
+  failedJobsHistoryLimit: 0
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 600
+      parallelism: 1
+      template:
+        metadata:
+          labels:
+            app: etl-gdet-restore
+        spec:
+          containers:
+          - name: etl-gdet-restore
+            resources:
+              limits:
+                memory: 512Mi
+                cpu: 250m
+            image: us-docker.pkg.dev/gdet-001/gdet-docker-images/etl-gdet:latest
+            imagePullPolicy: Always
+            command:
+              - /bin/sh
+              - -c
+              - python3 -m luigi --module tasks RestoreHRTablesFromAVRO --workers $LUIGI_WORKERS
+            env:
+            - name: LUIGI_WORKERS
+              value: "2"
+          restartPolicy: OnFailure
+      backoffLimit: 1

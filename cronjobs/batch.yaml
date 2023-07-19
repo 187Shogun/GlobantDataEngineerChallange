@@ -1,7 +1,7 @@
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
-  name: etl-gdet
+  name: etl-gdet-batch
 spec:
   schedule: "1 1 1 1 *"
   concurrencyPolicy: Forbid
@@ -14,10 +14,10 @@ spec:
       template:
         metadata:
           labels:
-            app: etl-gdet
+            app: etl-gdet-batch
         spec:
           containers:
-          - name: etl-gdet
+          - name: etl-gdet-batch
             resources:
               limits:
                 memory: 512Mi
