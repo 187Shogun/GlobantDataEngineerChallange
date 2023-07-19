@@ -218,3 +218,39 @@ class RestoreHRTablesFromAVRO(luigi.WrapperTask):
         """
         for i in self.TABLES:
             yield RestoreTableFromAvro(TABLE_NAME=i)
+
+
+class RunDBTPipeline(CustomExternalTask):
+    """ Run DBT pipeline. """
+    DBT_TAG = luigi.Parameter()
+    FULL_REFRESH = luigi.Parameter()
+    DBT_DIR = "./dbt_gdet/"
+
+    def output(self):
+        return luigi.LocalTarget(f"tmp/{self.get_task_family()}.txt")
+
+    def run(self):
+        self.debug_dbt()
+        self.build_dbt()
+        self.write_txt()
+
+    def debug_dbt(self):
+        exit_code = os.system(f"dbt debug --profiles-dir {self.DBT_DIR} --project-dir {self.DBT_DIR}")
+        if exit_code != 0:
+            raise AssertionError("DBT Pipeline returned a non-zero code. ")
+
+    def build_dbt(self):
+        cmd = 'dbt build'
+        options = [
+            f"--profiles-dir {self.DBT_DIR} ",
+            f"--project-dir {self.DBT_DIR} ",
+        ]
+        if self.DBT_TAG != "<NA>":
+            options.append(f"--select tag:{self.DBT_TAG} ")
+        if eval(self.FULL_REFRESH) is True:
+            options.append("--full-refresh")
+        cmd_parsed = f"{cmd} {''.join(options)}"
+        print(cmd_parsed)
+        exit_code = os.system(cmd_parsed)
+        if exit_code != 0:
+            raise AssertionError("DBT Pipeline returned a non-zero code. ")

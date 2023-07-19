@@ -1,0 +1,13 @@
+dbt_gdet:
+  outputs:
+    dev:
+      dataset: sdz
+      job_execution_timeout_seconds: 300
+      job_retries: 1
+      location: US
+      method: oauth
+      priority: interactive
+      project: gdet-001
+      threads: 8
+      type: bigquery
+  target: dev
