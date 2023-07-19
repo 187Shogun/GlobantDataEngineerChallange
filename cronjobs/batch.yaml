@@ -27,9 +27,10 @@ spec:
             command:
               - /bin/sh
               - -c
-              - python3 -m luigi --module tasks LoadHRObjectsToBigQuery --workers $LUIGI_WORKERS
+              - python3 -m luigi --module tasks LoadHRObjectsToBigQuery --workers $LUIGI_WORKERS --local-scheduler
             env:
             - name: LUIGI_WORKERS
               value: "2"
           restartPolicy: OnFailure
+          serviceAccountName: gke-worker-sa
       backoffLimit: 1
